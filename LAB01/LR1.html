@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Варіант 7: Циліндр на похилій площині в AR</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    
+    <script>
+      // Компонент для анімації кочення та синхронізації векторів сил
+      AFRAME.registerComponent('rolling-cylinder', {
+        schema: {
+          speed: {type: 'number', default: 0.5}, // швидкість руху
+          angle: {type: 'number', default: 15}   // кут нахилу площини в градусах
+        },
+        init: function () {
+          this.radius = 0.3; // радіус циліндра
+          this.startX = -1.2; // початкова позиція X на площині
+          this.endX = 1.2;    // кінцева позиція X
+          this.currentX = this.startX;
+          
+          // Зберігаємо посилання на вектори для оновлення їхньої позиції
+          this.gravityArrow = document.querySelector('#gravity-arrow');
+          this.normalArrow = document.querySelector('#normal-arrow');
+          this.frictionArrow = document.querySelector('#friction-arrow');
+        },
+        tick: function (time, timeDelta) {
+          let deltaSeconds = timeDelta / 1000;
+          
+          // Оновлення позиції вздовж похилої площини (локальна вісь X)
+          this.currentX += this.schema.speed * deltaSeconds;
+          if (this.currentX > this.endX) {
+            this.currentX = this.startX; // повернення на початок
+          }
+          
+          // Розрахунок кута повороту (кочення без ковзання: кут = відстань / радіус)
+          // Переводимо в градуси для A-Frame і додаємо знак мінус для кочення праворуч
+          let distance = this.currentX - this.startX;
+          let rotationZ = - (distance / this.radius) * (180 / Math.PI);
+          
+          // Встановлюємо локальні координати та поворот для циліндра
+          // Вісь Y піднята на величину радіуса, щоб циліндр лежав на площині
+          this.el.setAttribute('position', {x: this.currentX, y: this.radius, z: 0});
+          this.el.setAttribute('rotation', {x: 90, y: 0, z: rotationZ}); // x: 90 для правильної орієнтації циліндра
+          
+          // Оновлення позиції векторів сил, щоб вони рухалися разом із циліндром
+          if (this.gravityArrow && this.normalArrow && this.frictionArrow) {
+            // Вектори знаходяться всередині контейнера площини, тому копіюють її нахил.
+            // Сила тяжіння має бути завжди спрямована вертикально вниз, тому компенсуємо нахил площини
+            this.gravityArrow.setAttribute('position', {x: this.currentX, y: this.radius, z: 0});
+            this.gravityArrow.setAttribute('rotation', {x: 0, y: 0, z: -this.schema.angle});
+            
+            // Сила нормальної реакції спрямована перпендикулярно площині (вздовж локальної Y)
+            this.normalArrow.setAttribute('position', {x: this.currentX, y: this.radius, z: 0});
+            
+            // Сила тертя прикладена в точці дотику (y = 0) і спрямована назад (вліво)
+            this.frictionArrow.setAttribute('position', {x: this.currentX, y: 0, z: 0});
+          }
+        }
+      });
+    </script>
+  </head>
+
+  <body style="margin: 0; overflow: hidden;">
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+      
+      <a-assets>
+        <img id="wood-texture" src="https://raw.githubusercontent.com/aframevr/sample-assets/master/assets/images/wood/wooden-flooring_01_diffuse_1k.jpg" crossorigin="anonymous">
+        <img id="noise-texture" src="https://raw.githubusercontent.com/aframevr/sample-assets/master/assets/images/noise/distort.jpg" crossorigin="anonymous">
+      </a-assets>
+
+      <a-marker type="pattern" url="pattern-rolling-stones.patt">
+        
+        <a-entity light="type: directional; color: #FFF; intensity: 0.8" position="-1 4 2"></a-entity>
+        <a-entity light="type: ambient; color: #BBB"></a-entity>
+
+        <a-entity id="inclined-plane" rotation="0 0 -15" position="0 0 0">
+          
+          <a-box position="0 -0.05 0" width="3" height="0.1" depth="1" 
+                 material="src: #wood-texture; repeat: 2 1"></a-box>
+
+          <a-cylinder id="cylinder" radius="0.3" height="0.8" 
+                      material="src: #noise-texture; color: #ffaa55"
+                      rolling-cylinder="speed: 0.6; angle: 15"></a-cylinder>
+
+          <a-entity id="gravity-arrow">
+            <a-cone radius-bottom="0.04" radius-top="0" height="0.15" color="#ff0000" position="0 -0.5 0" rotation="0 0 180"></a-cone>
+            <a-cylinder radius="0.015" height="0.4" color="#ff0000" position="0 -0.25 0"></a-cylinder>
+          </a-entity>
+
+          <a-entity id="normal-arrow">
+            <a-cone radius-bottom="0.04" radius-top="0" height="0.15" color="#00ff00" position="0 0.5 0"></a-cone>
+            <a-cylinder radius="0.015" height="0.4" color="#00ff00" position="0 0.25 0"></a-cylinder>
+          </a-entity>
+
+          <a-entity id="friction-arrow">
+            <a-cone radius-bottom="0.04" radius-top="0" height="0.15" color="#0000ff" position="-0.4 0 0" rotation="0 0 90"></a-cone>
+            <a-cylinder radius="0.015" height="0.3" color="#0000ff" position="-0.15 0 0" rotation="0 0 90"></a-cylinder>
+          </a-entity>
+
+        </a-entity>
+
+      </a-marker>
+
+      <a-entity camera></a-entity>
+    </a-scene>
+  </body>
+</html>
