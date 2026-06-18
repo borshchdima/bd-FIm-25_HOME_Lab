@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Handpose Finger Angles</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+        }
+        /* Головний контейнер для камери та інформації */
+        .main-content {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        #video {
+            transform: scaleX(-1);
+            border-radius: 8px;
+            display: none; /* Спочатку ховаємо відео */
+        }
+        #canvas {
+            transform: scaleX(-1);
+            border-radius: 8px;
+        }
+        .video-container {
+            position: relative;
+        }
+        #angles {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            width: 300px;
+            box-sizing: border-box;
+        }
+        .angle-item {
+            margin: 5px 0;
+        }
+        #loading {
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Handpose Finger Angles</h1>
+    <p>Кути між пальцями руки</p>
+    
+    <div id="loading">Завантаження моделі...</div>
+    
+    <div class="main-content">
+        <div class="video-container">
+            <video id="video" width="640" height="480" autoplay playsinline></video>
+            <canvas id="canvas" width="640" height="480"></canvas>
+        </div>
+        
+        <div id="angles">
+            <h3>Кути між пальцями:</h3>
+            <div id="angle-results"></div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const angleResults = document.getElementById('angle-results');
+        const loadingElement = document.getElementById('loading');
+
+        // Finger pairs to calculate angles between
+        const fingerPairs = [
+            ['THUMB', 'INDEX_FINGER'],
+            ['INDEX_FINGER', 'MIDDLE_FINGER'],
+            ['MIDDLE_FINGER', 'RING_FINGER'],
+            ['RING_FINGER', 'PINKY']
+        ];
+
+        // Finger landmarks structure
+        const fingerIndices = {
+            THUMB: [1, 2, 3, 4],
+            INDEX_FINGER: [5, 6, 7, 8],
+            MIDDLE_FINGER: [9, 10, 11, 12],
+            RING_FINGER: [13, 14, 15, 16],
+            PINKY: [17, 18, 19, 20]
+        };
+
+        let model;
+        let landmarks = [];
+
+        // Start webcam and handpose
+        async function init() {
+            try {
+                // Load handpose model
+                loadingElement.textContent = "Завантаження моделі TensorFlow.js...";
+                model = await handpose.load();
+                loadingElement.textContent = "Модель завантажена. Запит до камери...";
+                
+                // Start webcam
+                if (navigator.mediaDevices.getUserMedia) {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: 640, 
+                            height: 480,
+                            facingMode: "user" 
+                        } 
+                    });
+                    
+                    video.srcObject = stream;
+                    
+                    // Чекаємо, поки відео почне відтворюватися
+                    await new Promise((resolve) => {
+                        video.onloadedmetadata = () => {
+                            // Встановлюємо розміри canvas відповідно до відео
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
+                            video.style.display = 'block'; // Показуємо відео
+                            loadingElement.style.display = 'none';
+                            resolve();
+                        };
+                    });
+                    
+                    detectHand();
+                }
+            } catch (error) {
+                loadingElement.textContent = "Помилка: " + error.message;
+                console.error("Помилка ініціалізації:", error);
+            }
+        }
+
+        // Detect hand and calculate angles
+        async function detectHand() {
+            try {
+                // Перевіряємо, чи відео готове
+                if (video.readyState < 2) {
+                    requestAnimationFrame(detectHand);
+                    return;
+                }
+
+                // Detect hands
+                const predictions = await model.estimateHands(video);
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                if (predictions.length > 0) {
+                    landmarks = predictions[0].landmarks;
+                    
+                    // Draw landmarks
+                    drawLandmarks();
+                    
+                    // Calculate and display angles
+                    calculateAngles();
+                }
+            } catch (error) {
+                console.error("Помилка розпізнавання руки:", error);
+            }
+            
+            // Repeat detection
+            requestAnimationFrame(detectHand);
+        }
+
+        // Draw hand landmarks
+        function drawLandmarks() {
+            ctx.fillStyle = 'red';
+            
+            // Draw all landmarks
+            for (let i = 0; i < landmarks.length; i++) {
+                const [x, y] = landmarks[i];
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            
+            // Draw connections between landmarks
+            drawConnections();
+        }
+
+        // Draw connections between landmarks (simplified)
+        function drawConnections() {
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            
+            // Draw connections for each finger
+            for (const finger in fingerIndices) {
+                const indices = fingerIndices[finger];
+                ctx.beginPath();
+                
+                for (let i = 0; i < indices.length; i++) {
+                    const [x, y] = landmarks[indices[i]];
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+            }
+            
+            // Connect MCP joints
+            ctx.beginPath();
+            let first = true;
+            for (const finger in fingerIndices) {
+                const mcpIndex = fingerIndices[finger][0];
+                const [x, y] = landmarks[mcpIndex];
+                if (first) {
+                    ctx.moveTo(x, y);
+                    first = false;
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+        }
+
+        // Calculate angles between fingers
+        function calculateAngles() {
+            angleResults.innerHTML = '';
+            
+            // Calculate vector from MCP to TIP for each finger
+            const fingerVectors = {};
+            for (const finger in fingerIndices) {
+                const mcp = landmarks[fingerIndices[finger][0]];
+                const tip = landmarks[fingerIndices[finger][3]];
+                fingerVectors[finger] = {
+                    vector: [tip[0] - mcp[0], tip[1] - mcp[1], tip[2] - mcp[2]],
+                    length: Math.sqrt(
+                        Math.pow(tip[0] - mcp[0], 2) + 
+                        Math.pow(tip[1] - mcp[1], 2) + 
+                        Math.pow(tip[2] - mcp[2], 2)
+                    )
+                };
+            }
+            
+            // Calculate angles between finger pairs
+            for (const pair of fingerPairs) {
+                const [finger1, finger2] = pair;
+                const vec1 = fingerVectors[finger1].vector;
+                const vec2 = fingerVectors[finger2].vector;
+                
+                // Dot product
+                const dotProduct = vec1[0] * vec2[0] + vec1[1] * vec2[1] + vec1[2] * vec2[2];
+                
+                // Magnitudes
+                const mag1 = fingerVectors[finger1].length;
+                const mag2 = fingerVectors[finger2].length;
+                
+                // Avoid division by zero
+                if (mag1 > 0 && mag2 > 0) {
+                    // Clamp value to [-1, 1] to avoid numerical errors
+                    const cosTheta = Math.min(1, Math.max(-1, dotProduct / (mag1 * mag2)));
+                    const angleRad = Math.acos(cosTheta);
+                    const angleDeg = (angleRad * 180 / Math.PI).toFixed(1);
+                    
+                    // Display angle
+                    const angleItem = document.createElement('div');
+                    angleItem.className = 'angle-item';
+                    angleItem.textContent = `${finger1} ↔ ${finger2}: ${angleDeg}°`;
+                    angleResults.appendChild(angleItem);
+                }
+            }
+        }
+
+        // Initialize when page loads
+        window.onload = init;
+    </script>
+</body>
+</html>
