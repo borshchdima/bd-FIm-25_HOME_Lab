@@ -8,7 +8,7 @@
   <body>
     <a-scene>
       <a-sky src="nebo.png" color="#b3ffff"></a-nebo>
-      <a-torus position="-2 1 -5" color="blue" radius="1.2"></a-torus>
+      <a-torus position="1 1 -2" color="blue" radius="1.2"></a-torus>
       <a-plane width="7" height="7" rotation="-55 0 0" position="-2 -2 -5" color="red"></a-plane>
       <a-cylinder color="orange" height="2" radius="0.05" position="-2 -1 -5"></a-cylinder>
       <a-cylinder color="blue" height="2" radius="0.05" position="-3 -1 -5"></a-cylinder>
