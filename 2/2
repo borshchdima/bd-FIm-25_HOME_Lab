@@ -14,7 +14,7 @@
       </a-assets>
 
       <a-nebo src="#nebo" color="#87CEFA"></a-nebo>
-      <a-torus position="1 1 -2" color="green" radius="1.2"
+      <a-torus position="-2 1 -5" color="green" radius="1.2"
       animation = "property: components.material.material.color; type: color; from: green; to: red; loop: true; dur: 10000"
       ></a-torus>
       <a-plane src = "#caravaggio" width="7" height="7" rotation="-50 0 0" position="-2 -2 -5" color="purple"></a-plane>
